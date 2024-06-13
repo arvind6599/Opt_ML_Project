@@ -11,6 +11,13 @@ import torch.nn.functional as F
 
 
 def deep_leakage_from_gradients(model, origin_grad): 
+    '''
+    This function calculates the deep leakage from gradients of a model. It takes in the model and the gradients of the model as input and returns the deep leakage.
+
+    Parameters:
+    model (torch.nn.Module): The model for which the deep leakage is to be calculated.
+    origin_grad (torch.Tensor): Publicly shared gradients of the model, used to find the deep leakage.
+    '''
 
     dummy_data = torch.randn(origin_data.size())
     dummy_label =  torch.randn(dummy_label.size())
@@ -24,14 +31,14 @@ def deep_leakage_from_gradients(model, origin_grad):
             dummy_grad = grad(dummy_loss, model.parameters(), create_graph=True)
 
             grad_diff = sum(((dummy_grad - origin_grad) ** 2).sum() \
-            for dummy_g, origin_g in zip(dummy_grad, origin_grad))
+                for dummy_g, origin_g in zip(dummy_grad, origin_grad))
             
             grad_diff.backward()
             return grad_diff
-
+        
         optimizer.step(closure)
-    
-    return  dummy_data, dummy_label
+        
+    return dummy_data, dummy_label
 
 
 def label_to_onehot(target, num_classes=100):
@@ -42,7 +49,6 @@ def label_to_onehot(target, num_classes=100):
 
 def cross_entropy_for_onehot(pred, target):
     return torch.mean(torch.sum(- target * F.log_softmax(pred, dim=-1), 1))
-
 
 
 
@@ -66,15 +72,9 @@ def quantize(x,input_compress_settings={}):
     margin=(compare < final_p).float()
     xi=(floor_p+margin)/n
     
-    
-    
     Tilde_x=x_norm*sgn_x*xi
     
     return Tilde_x
-
-
-
-
 
 
 def uniform_quantization(x, levels):
@@ -92,6 +92,14 @@ def uniform_quantization(x, levels):
     return quantized
 
 def log_quantization(tensor, base=2):
+    '''
+    Perform log quantization on the input tensor x, with base as the base of the logarithm.
+
+    Parameters:
+    tensor (torch.Tensor): The input tensor to be quantized.
+    base (int): The base of the logarithm to be used for quantization.
+    '''
+
     sign = torch.sign(tensor)
     log_tensor = torch.log(torch.abs(tensor) + 1e-9) / torch.log(torch.tensor(base))
     quantized = torch.round(log_tensor) * torch.log(torch.tensor(base))
@@ -100,6 +108,12 @@ def log_quantization(tensor, base=2):
 
 
 def kmeans_quantization(tensor, clusters):
+    '''
+    Perform k-means quantization on the input tensor x, with clusters number of clusters.
+    Parameters:
+    tensor (torch.Tensor): The input tensor to be quantized.
+    clusters (int): The number of clusters to quantize the input tensor into.
+    '''
     tensor_reshaped = tensor.view(-1, 1).numpy()
     kmeans = KMeans(n_clusters=clusters).fit(tensor_reshaped)
     quantized = torch.tensor(kmeans.cluster_centers_[kmeans.labels_]).view_as(tensor)
@@ -125,6 +139,10 @@ def stochastic_rounding(tensor, levels):
     return quantized
 
 def fixed_point_quantization(tensor, num_bits, fractional_bits):
+    '''
+    Fixed-point quantization involves scaling the input tensor by a power of 2, rounding to the nearest integer, and then scaling back to the original range.
+    '''
+
     scale = 2 ** fractional_bits
     quantized = torch.round(tensor * scale) / scale
     max_val = 2 ** (num_bits - fractional_bits - 1) - 1 / scale
@@ -158,25 +176,3 @@ def add_sparsity(x, sparsity_ratio=0.2):
         return x
 
 
-def deep_leakage_from_gradients(model, origin_grad): 
-
-    dummy_data = torch.randn(origin_data.size())
-    dummy_label =  torch.randn(dummy_label.size())
-    optimizer = torch.optim.LBFGS([dummy_data, dummy_label] )
-
-    for iters in range(300):
-        def closure():
-            optimizer.zero_grad()
-            dummy_pred = model(dummy_data) 
-            dummy_loss = criterion(dummy_pred, F.softmax(dummy_label, dim=-1)) 
-            dummy_grad = grad(dummy_loss, model.parameters(), create_graph=True)
-
-            grad_diff = sum(((dummy_grad - origin_grad) ** 2).sum() \
-                for dummy_g, origin_g in zip(dummy_grad, origin_grad))
-            
-            grad_diff.backward()
-            return grad_diff
-        
-        optimizer.step(closure)
-        
-    return dummy_data, dummy_label
