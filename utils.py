@@ -6,6 +6,50 @@ Input must be a pytorch tensor
 
 import torch
 import numpy as np
+from sklearn.cluster import KMeans
+import torch.nn.functional as F
+
+
+def deep_leakage_from_gradients(model, origin_grad): 
+    '''
+    This function calculates the deep leakage from gradients of a model. It takes in the model and the gradients of the model as input and returns the deep leakage.
+
+    Parameters:
+    model (torch.nn.Module): The model for which the deep leakage is to be calculated.
+    origin_grad (torch.Tensor): Publicly shared gradients of the model, used to find the deep leakage.
+    '''
+
+    dummy_data = torch.randn(origin_data.size())
+    dummy_label =  torch.randn(dummy_label.size())
+    optimizer = torch.optim.LBFGS([dummy_data, dummy_label] )
+
+    for iters in range(300):
+        def closure():
+            optimizer.zero_grad()
+            dummy_pred = model(dummy_data) 
+            dummy_loss = criterion(dummy_pred, F.softmax(dummy_label, dim=-1)) 
+            dummy_grad = grad(dummy_loss, model.parameters(), create_graph=True)
+
+            grad_diff = sum(((dummy_grad - origin_grad) ** 2).sum() \
+                for dummy_g, origin_g in zip(dummy_grad, origin_grad))
+            
+            grad_diff.backward()
+            return grad_diff
+        
+        optimizer.step(closure)
+        
+    return dummy_data, dummy_label
+
+
+def label_to_onehot(target, num_classes=100):
+    target = torch.unsqueeze(target, 1)
+    onehot_target = torch.zeros(target.size(0), num_classes, device=target.device)
+    onehot_target.scatter_(1, target, 1)
+    return onehot_target
+
+def cross_entropy_for_onehot(pred, target):
+    return torch.mean(torch.sum(- target * F.log_softmax(pred, dim=-1), 1))
+
 
 
 def quantize(x,input_compress_settings={}):
@@ -28,80 +72,107 @@ def quantize(x,input_compress_settings={}):
     margin=(compare < final_p).float()
     xi=(floor_p+margin)/n
     
-    
-    
     Tilde_x=x_norm*sgn_x*xi
     
     return Tilde_x
 
 
-
-
-def sparse_randomized(x,input_compress_settings={}):
+def uniform_quantization(x, levels=16):
     '''
-    This function is used to compress the input tensor x by using the sparse randomized method.
+    Perform uniform quantization on the input tensor x, with levels number of levels.
+
+    Parameters:
+    x (torch.Tensor): The input tensor to be quantized.
+    levels (int): The number of levels to quantize the input tensor into.
+
     '''
-    max_iteration=10000
-    compress_settings={'p':0.8}
-    compress_settings.update(input_compress_settings)
-    #p=compress_settings['p']
-    #vec_x=x.flatten()
-    #out=torch.dropout(vec_x,1-p,train=True)
-    #out=out/p
-    vec_x=x.flatten()
-    d = int(len(vec_x))
-    p=compress_settings['p']
+    min_val, max_val = x.min(), x.max()
+    scale = (max_val - min_val) / (levels - 1)
+    quantized = torch.round((x - min_val) / scale) * scale + min_val
+    return quantized
+
+def log_quantization(tensor, base=2):
+    '''
+    Perform log quantization on the input tensor x, with base as the base of the logarithm.
+
+    Parameters:
+    tensor (torch.Tensor): The input tensor to be quantized.
+    base (int): The base of the logarithm to be used for quantization.
+    '''
+
+    sign = torch.sign(tensor)
+    log_tensor = torch.log(torch.abs(tensor) + 1e-9) / torch.log(torch.tensor(base))
+    quantized = torch.round(log_tensor) * torch.log(torch.tensor(base))
+    return sign * torch.exp(quantized)
+
+
+
+def kmeans_quantization(tensor, clusters=4):
+    '''
+    Perform k-means quantization on the input tensor x, with clusters number of clusters.
+    Parameters:
+    tensor (torch.Tensor): The input tensor to be quantized.
+    clusters (int): The number of clusters to quantize the input tensor into.
+    '''
+    tensor_reshaped = tensor.view(-1, 1).numpy()
+    kmeans = KMeans(n_clusters=clusters).fit(tensor_reshaped)
+    quantized = torch.tensor(kmeans.cluster_centers_[kmeans.labels_]).view_as(tensor)
+    return quantized
+
+
+def stochastic_rounding(tensor, levels=16):
+    '''
+    Stochastic rounding involves rounding to the nearest quantized value with a probability proportional to the distance from the exact value, which can preserve more information in expectation
+
+    Parameters:
+    tensor (torch.Tensor): The input tensor to be quantized.
+    levels (int): The number of levels to quantize the input tensor into.
+    '''
+
+    min_val, max_val = tensor.min(), tensor.max()
+    scale = (max_val - min_val) / (levels - 1)
+    scaled = (tensor - min_val) / scale
+    lower = torch.floor(scaled)
+    upper = torch.ceil(scaled)
+    prob = scaled - lower
+    quantized = torch.where(torch.rand_like(tensor) < prob, upper, lower) * scale + min_val
+    return quantized
+
+def fixed_point_quantization(tensor, num_bits, fractional_bits):
+    '''
+    Fixed-point quantization involves scaling the input tensor by a power of 2, rounding to the nearest integer, and then scaling back to the original range.
+    '''
+
+    scale = 2 ** fractional_bits
+    quantized = torch.round(tensor * scale) / scale
+    max_val = 2 ** (num_bits - fractional_bits - 1) - 1 / scale
+    min_val = -max_val
+    quantized = torch.clamp(quantized, min_val, max_val)
+    return quantized
+
+
+def add_sparsity(x, sparsity_ratio=0.1):
+    """
+    Adds sparsity to the input tensor by setting a specified percentage of the smallest absolute values to zero.
     
-    abs_x=torch.abs(vec_x)
-    #d=torch.prod(torch.Tensor(x.size()))
-    out=torch.min(p*d*abs_x/torch.sum(abs_x),torch.ones_like(abs_x))
-    i=0
-    while True:
-        i+=1
-        #print(i)
-        if i>=max_iteration:
-            raise ValueError('Too much operations!')
-        temp=out.detach()
-            
-        cI=1-torch.eq(out,1).float()
-        c=(p*d-d+torch.sum(cI))/torch.sum(out*cI)
-        if c<=1:
-            break
-        out=torch.min(c*out,torch.ones_like(out))
-        if torch.sum(1-torch.eq(out,temp)):
-            break
+    Parameters:
+    tensor (torch.Tensor): The input tensor.
+    sparsity_ratio (float): The ratio of elements to be set to zero, between 0 and 1.
     
-    z=torch.rand_like(out)
-    out=vec_x*(z<out).float()/out
+    Returns:
+    torch.Tensor: The sparse tensor.
+    """
+    flat_tensor = x.flatten()
+    k = int(sparsity_ratio * flat_tensor.size(0))
 
-    out=out.reshape(x.shape)
-
-    #out=out.reshape(x.shape)
-    return out
-
-def one_bit(x,input_compress_settings={}):
+    # print("Number of elemnts that will be zeroed out",k)
     
-    x_norm=torch.norm(x,p=float('inf'))
-    sgn_x=((x>0).float()-0.5)*2
-    
-    compressed_x=x_norm*sgn_x
-    
-    return compressed_x
+    if k > 0:
+        threshold = flat_tensor.abs().kthvalue(k).values.item()
+        mask = flat_tensor.abs() > threshold
+        sparse_tensor = flat_tensor * mask.float()
+        return sparse_tensor.view_as(x)
+    else:
+        return x
 
 
-
-def sparse_top_k(x,input_compress_settings={}):
-    compress_settings={'k':1/32}
-    compress_settings.update(input_compress_settings)
-    k=compress_settings['k']
-    vec_x=x.flatten()
-    d = int(len(vec_x))
-    #print(d)
-    k =int(np.ceil(d*k))
-    #print(k)
-    indices = torch.abs(vec_x).topk(k)[1]
-    out_x = torch.zeros_like(vec_x)
-    out_x[indices] = vec_x[indices]
-    out_x=out_x.reshape(x.shape)
-    #print(x.shape)
-    return out_x
