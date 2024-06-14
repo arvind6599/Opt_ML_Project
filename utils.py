@@ -77,7 +77,7 @@ def quantize(x,input_compress_settings={}):
     return Tilde_x
 
 
-def uniform_quantization(x, levels):
+def uniform_quantization(x, levels=16):
     '''
     Perform uniform quantization on the input tensor x, with levels number of levels.
 
@@ -107,7 +107,7 @@ def log_quantization(tensor, base=2):
 
 
 
-def kmeans_quantization(tensor, clusters):
+def kmeans_quantization(tensor, clusters=4):
     '''
     Perform k-means quantization on the input tensor x, with clusters number of clusters.
     Parameters:
@@ -120,7 +120,7 @@ def kmeans_quantization(tensor, clusters):
     return quantized
 
 
-def stochastic_rounding(tensor, levels):
+def stochastic_rounding(tensor, levels=16):
     '''
     Stochastic rounding involves rounding to the nearest quantized value with a probability proportional to the distance from the exact value, which can preserve more information in expectation
 
@@ -151,7 +151,7 @@ def fixed_point_quantization(tensor, num_bits, fractional_bits):
     return quantized
 
 
-def add_sparsity(x, sparsity_ratio=0.2):
+def add_sparsity(x, sparsity_ratio=0.1):
     """
     Adds sparsity to the input tensor by setting a specified percentage of the smallest absolute values to zero.
     
