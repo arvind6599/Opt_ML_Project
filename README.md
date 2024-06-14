@@ -59,10 +59,10 @@ The repository contains code describing the different methods of analysis done i
 
 > This is the directory in which all the image files generated from the code are stored
 
-### Data
 
-> This is the directory to load in the CIFAR10 Dataset
+### Checkpoints
 
+> This is the directory in which all the checkpoint files containing the model weights and their corresponding gradient tensors from different phases (start, middle, near to convergence) of training are stored. 
 
 ### Authors 
 
