@@ -8,7 +8,163 @@ import torch
 import numpy as np
 from sklearn.cluster import KMeans
 import torch.nn.functional as F
+import torch.nn as nn
+import torch.optim as optim
 
+device = "cpu"
+if torch.cuda.is_available():
+    device = "cuda"
+def reconstruct(net,cp_dummy_data, cp_dummy_label, gradients,tt):
+
+    optimizer = torch.optim.LBFGS([cp_dummy_data, cp_dummy_label])
+    optimizer.zero_grad()
+    history = []
+    for iters in range(100):
+        def closure():
+            optimizer.zero_grad()
+
+            pred = net(cp_dummy_data)
+            dummy_onehot_label = F.softmax(cp_dummy_label, dim=-1)
+            dummy_loss = cross_entropy_for_onehot(pred, dummy_onehot_label) # TODO: fix the gt_label to dummy_label in both code and slides.
+            dummy_dy_dx = torch.autograd.grad(dummy_loss, net.parameters(), create_graph=True)
+
+            grad_diff = 0
+            grad_count = 0
+            for gx, gy in zip(dummy_dy_dx, gradients): # TODO: fix the variablas here
+                grad_diff += ((gx - gy) ** 2).sum()
+                grad_count += gx.nelement()
+            # grad_diff = grad_diff / grad_count * 1000
+            grad_diff.backward()
+
+            return grad_diff
+
+        optimizer.step(closure)
+        if iters % 10 == 0:
+            current_loss = closure()
+            print(iters, "%.4f" % current_loss.item())
+        history.append(tt(cp_dummy_data[0].cpu()))
+
+    return history
+
+def train(model, num_epochs, testloader, trainloader, num_batches, compress_function=None, input_compress_settings=None):
+
+  # Define loss function and optimizer
+  criterion = nn.CrossEntropyLoss()
+  optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+
+  # Lists to store metrics
+  train_losses = []
+  test_losses = []
+  train_accuracies = []
+  test_accuracies = []
+
+
+  for epoch in range(num_epochs):
+      model.train()
+      running_loss = 0.0
+      
+      for batch_idx, (inputs, targets) in enumerate(trainloader):
+        if batch_idx >= num_batches:
+          break
+
+        inputs, targets = inputs.cuda(), targets.cuda()
+
+        optimizer.zero_grad()
+        # print(targets)
+
+        outputs = model(inputs)
+        # print(outputs)
+        onehot_target= label_to_onehot(targets)
+
+        # loss = criterion(outputs, targets)
+        loss = cross_entropy_for_onehot(outputs,onehot_target)
+        loss.backward()
+
+        # Apply gradient compression
+        if compress_function is not None and input_compress_settings is not None:
+            for param in model.parameters():
+                if param.grad is not None:
+                    param.grad.data = compress_function(param.grad.data, input_compress_settings)
+
+        optimizer.step()
+        running_loss += loss.item()
+
+
+
+      print(f'Epoch {epoch + 1}, Train_Loss: {running_loss / len(trainloader)}')
+      train_losses.append(running_loss / len(trainloader))
+
+      # Validate the model
+      model.eval()
+      test_loss = 0
+      correct = 0
+      total = 0
+      with torch.no_grad():
+          for inputs, targets in testloader:
+              inputs, targets = inputs.cuda(), targets.cuda()
+              outputs = model(inputs)
+              loss = criterion(outputs, targets)
+              test_loss += loss.item()
+              _, predicted = torch.max(outputs, 1)
+              total += targets.size(0)
+              correct += (predicted == targets).sum().item()
+
+      print(f'Epoch {epoch + 1}, Test_Loss: {test_loss / len(testloader)}')
+      test_losses.append(test_loss / len(testloader))
+      print(f'Accuracy: {100 * correct / total}%')
+      test_accuracies.append(100 * correct / total)
+      print("###########################################")
+
+      # if (epoch%10==0):
+
+
+  print('Finished Training')
+
+  return train_losses, test_losses, test_accuracies, model
+
+
+
+def regenerate(net, gradient, criterion, epochs,sample_data, tt):
+
+    x_shape, y_shape = sample_data[0].size(),sample_data[1].size()
+
+    dummy_data = torch.randn(x_shape).to(device).requires_grad_(True)
+    dummy_label = torch.randn(y_shape).to(device).requires_grad_(True)
+    optimizer = torch.optim.LBFGS([dummy_data, dummy_label] )
+
+    history = []
+    for iters in range(epochs):
+        def closure():
+            optimizer.zero_grad()
+
+            pred = net(dummy_data)
+            dummy_onehot_label = F.softmax(dummy_label, dim=-1)
+            dummy_loss = criterion(pred, dummy_onehot_label) # TODO: fix the gt_label to dummy_label in both code and slides.
+            dummy_dy_dx = torch.autograd.grad(dummy_loss, net.parameters(), create_graph=True)
+            if iters == 0:
+                print(dummy_dy_dx)
+            grad_diff = 0
+
+            for gx, gy in zip(dummy_dy_dx, gradient): # TODO: fix the variablas here
+                grad_diff += ((gx - gy) ** 2).sum()
+   
+            grad_diff.backward()
+            
+            return grad_diff
+        # print(iters)
+        optimizer.step(closure)
+        error_tensor = torch.abs(sample_data[0].to(device) - dummy_data.to(device))
+        mean_error = torch.mean(error_tensor)
+        if iters % 10 == 0:
+            current_loss = closure()
+            print(current_loss, mean_error)
+        history.append([tt(dummy_data[0].cpu()),current_loss.item(),mean_error])  
+
+        # plt.imshow(history[iters][0])
+
+
+
+    return history
 
 def deep_leakage_from_gradients(model, origin_grad): 
     '''
@@ -77,7 +233,7 @@ def quantize(x,input_compress_settings={}):
     return Tilde_x
 
 
-def uniform_quantization(x, levels=16):
+def uniform_quantization(x, levels):
     '''
     Perform uniform quantization on the input tensor x, with levels number of levels.
 
@@ -107,7 +263,7 @@ def log_quantization(tensor, base=2):
 
 
 
-def kmeans_quantization(tensor, clusters=4):
+def kmeans_quantization(tensor, clusters):
     '''
     Perform k-means quantization on the input tensor x, with clusters number of clusters.
     Parameters:
@@ -120,7 +276,7 @@ def kmeans_quantization(tensor, clusters=4):
     return quantized
 
 
-def stochastic_rounding(tensor, levels=16):
+def stochastic_rounding(tensor, levels):
     '''
     Stochastic rounding involves rounding to the nearest quantized value with a probability proportional to the distance from the exact value, which can preserve more information in expectation
 
@@ -151,7 +307,7 @@ def fixed_point_quantization(tensor, num_bits, fractional_bits):
     return quantized
 
 
-def add_sparsity(x, sparsity_ratio=0.1):
+def add_sparsity(x, sparsity_ratio=0.2):
     """
     Adds sparsity to the input tensor by setting a specified percentage of the smallest absolute values to zero.
     
