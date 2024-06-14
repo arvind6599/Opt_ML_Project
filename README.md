@@ -1,42 +1,33 @@
-# Machine Learning Project 2: Autonomous Lane Changing using Deep Reinforcement Learning with Graph Neural Networks
+# OptML Project: On the Effect of Quantization on Deep Leakage from Gradients and Train-Test Accuracy
 
-![](https://github.com/BorveErik/Autonomous-Truck-Sim/blob/RL_training_env/simRes.gif)
+![](images/output_wo_quantization.png)
 
-**Authors:** Arvind Satish Menon, Lars C.P.M. Quaedvlieg, and Somesh Mehra
-
-**Supervisor:** [Erik Börve](mailto://borerik@chalmers.se)
-
-**Group:** GAN_CONTROL
+**Authors:** Arvind Satish Menon, Lars C.P.M. Quaedvlieg, and Sachin Bhadang
 
 ## Important Links
-- Final report: https://www.overleaf.com/read/sbtzctmpbqpy
-- In-depth project description: https://docs.google.com/document/d/1_oW5013IwnaLW3alfvVjh7CEu5wkTPQh/edit
+- In-depth project description: https://github.com/epfml/OptML_course/blob/master/labs/mini-project/miniproject_description.pdf
+
+## Objective
+
+This project aims to explore advanced quantization techniques to improve privacy preservation in distributed machine 
+learning systems without significantly degrading model performance.
 
 ## Project introduction
 
-In recent years, autonomous vehicles have garnered significant attention due to their potential to improve the safety,
-efficiency, and accessibility of transportation. One important aspect of autonomous driving is the ability to make
-lane-changing decisions, which requires the vehicle to predict the intentions and behaviors of other road users and to
-evaluate the safety and feasibility of different actions.
+Distributed machine learning systems have adopted the practice of sharing gradients rather than raw data to enhance
+privacy. However, these shared gradients can still be susceptible to privacy breaches through inversion attacks.
+Previous studies like Deep Leakage from Gradients (DLG) have shown that while mechanisms such as noise addition and
+gradient compression can mitigate these attacks, they often result in a substantial decrease in model accuracy. This
+project builds upon these findings by investigating quantization methods as a potential solution to balance both
+privacy preservation and model performance effectively.
 
-In this project, we propose a graph neural network (GNN) architecture combined with reinforcement learning (RL) and a model
-predictive controller to solve the problem of autonomous lane changing. By using GNNs, it is possible to learn a control
-policy that takes into account the complex and dynamic relationships between the vehicles, rather than just considering
-local features or patterns. More specifically, we employ Deep Q-learning with Graph Attention Networks for the agent.
-
-**Please note that not all the code is the work of this project group**. We will use a basis provided by our supervisor
-to build upon. For an idea of this basis, please utilize [this repository](https://github.com/BorveErik/Autonomous-Truck-Sim).
-However, we will also mention our contributions to every individual file further down this README.
-
-From the repository linked above:
-
->  This project provides an implementation of an autonomous truck in a multi-lane highway scenario. The controller utilizes
- non-linear optimal control to compute multiple feasible trajectories, of which the most cost-efficent is choosen. The
- simulation is set up to be suitable for RL training.
+**Please note that not all the code is the work of this project group**. We will use a basis provided by the DLG paper.
+For an idea of this basis, please utilize [this repository](https://github.com/mit-han-lab/dlg). However, we also
+merged these methods with our project contributions.
 
 ## Getting Started
 
-Clone the project in your local machine.
+Clone the project to your local machine.
 
 ### Requirements
 
@@ -45,10 +36,9 @@ Locate the repository and run:
   pip install -r requirements.txt
   ```
 
-**Additionally**, you need to install Pytorch and Pytorch Geometric separately. please note that for installing
-[Pytorch](https://pytorch.org/get-started/locally/) and [Pytorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html),
-please refer to the references installation guides for CPU or GPU and ensure that a *compatible version* of Pytorch has
-been installed for Pytorch Geometric.
+**Additionally**, you need to install PyTorch separately. please note that for installing
+[PyTorch](https://pytorch.org/get-started/locally/), please refer to the references installation guides for CPU or 
+GPU and ensure that a *compatible version* of PyTorch has been installed.
 
 | Package             | Use                         |
 |---------------------|-----------------------------|
@@ -231,25 +221,3 @@ options:
   --display_simulation  If provided, the simulation will be plotted and shown
                         at each time step
 ```
-
-
-### Who did what?
-
-Since we used a code template from our supervisor to build upon, it is important to note who made the contributions (our
-group or our supervisor).
-
-| File                  | Who                        |
-|-----------------------|----------------------------|
-| graph.py              | Project group              |
-| rlagent.py            | Project group              |
-| controllers.py        | Supervisor                 |
-| helpers.py            | Supervisor                 |
-| inference.py          | Project group              |
-| main.py               | Project group & Supervisor |
-| scenarios.py          | Supervisor                 |
-| traffic.py            | Supervisor                 |
-| vehicleModelGarage.py | Supervisor                 |
-
-In main.py, our supervisor made everything that has to do with the raw simulation and the controller. On top of that, we
-added everything to do with the RL Agent, the argument parsing (thus the models, hyperparameters and configurations), and
-TensorBoard.
