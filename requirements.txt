@@ -1,4 +1,6 @@
-torch
-torchvision
+#torch
+#torchvision
 matplotlib
 seaborn
+jupyter
+scikit-learn
