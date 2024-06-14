@@ -31,14 +31,16 @@ Clone the project to your local machine.
 
 ### Requirements
 
+Make sure to install an environment with Python 3.10.12 to match the version we used in our paper.
+
 Locate the repository and run:
-  ```sh
-  pip install -r requirements.txt
-  ```
+```sh
+pip install -r requirements.txt
+```
 
 **Additionally**, you need to install PyTorch separately. please note that for installing
 [PyTorch](https://pytorch.org/get-started/locally/), please refer to the references installation guides for CPU or 
-GPU and ensure that a *compatible version* of PyTorch has been installed.
+GPU and ensure that a *compatible version* of PyTorch has been installed. For example, with CUDA 12.1, you can run `pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121`.
 
 | Package             | Use                         |
 |---------------------|-----------------------------|
