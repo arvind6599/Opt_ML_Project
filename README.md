@@ -45,27 +45,23 @@ The repository contains code describing the different methods of analysis done i
 
 ## Structure of the repository
 
-    .
-    ├── Deep Leakage from Gradients               # Tests the quality of reconstructed images from quantized and compressed gradient tensors
-    ├── main               # Study the effect of quantization and compression on the model performance by measuring the train-test loss and also the test accuracy 
-    ├── Gradient Quantization               # Simple illustration of the Deep Leakage algorithm on a dummy problem
-    ├── Qualitative Evaluation               # Computing the average MSE values after running DLG on different seeds to test its convergence behaviour
+    ├── main.ipynb              # Study the effect of quantization and compression on the model performance by measuring the train-test loss and also the test accuracy 
+    ├── Deep_Leakage_from_Gradients.ipynb               # Tests the quality of reconstructed images from quantized and compressed gradient tensors
+    ├── Deep_Leakage_from_Experiments.ipynb               # Study the claim that DLG works for all convergence status i.e. it can extract sensitive data from the gradients at any point during the training process
+    ├── Gradient_Quantization.ipynb               # Simple illustration of the Deep Leakage algorithm on a dummy problem
+    ├── Qualitative_Evaluation.ipynb               # Computing the average MSE values after running DLG on different seeds to test its convergence behaviour
+    ├── Qualitative_Evaluation.ipynb               # Computing the average MSE values after running DLG on different seeds to test its convergence behaviour
     ├── .gitignore        # GitHub configuration settings
     ├── README.md         # Description of the repository
     └── requirements.txt  # Python packages to install before running the code
 
 ### Images
-    .
-    ├── Contain the figures generated to be included in our project report
 
-
-> This is the directory in which all the image files generated from the code
+> This is the directory in which all the image files generated from the code are stored
 
 ### Data
-    .
-    ├── Folder to load in the CIFAR10 Dataset
 
-> This is the directory where all the data resources are stored
+> This is the directory to load in the CIFAR10 Dataset
 
 
 ### Authors 
